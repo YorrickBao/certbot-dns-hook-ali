@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -29,34 +30,65 @@ func createDnsClient() *alidns.Client {
 	return client
 }
 
-func updateDnsRecord(client *alidns.Client, value string) {
-	recordId := os.Getenv("BAO_RECORD_ID")
+// func updateDnsRecord(client *alidns.Client, value string) {
+// 	recordId := os.Getenv("BAO_RECORD_ID")
+// 	recordType := "TXT"
+// 	recordRR := "_acme-challenge"
+// 	recordTTL := int64(600)
+
+// 	request := alidns.UpdateDomainRecordRequest{
+// 		RecordId: &recordId,
+// 		Type:     &recordType,
+// 		Value:    &value,
+// 		RR:       &recordRR,
+// 		TTL:      &recordTTL,
+// 	}
+// 	_, err := client.UpdateDomainRecord(&request)
+
+// 	if err != nil {
+// 		log.Fatalf("Error making request: %v", err)
+// 	}
+// }
+
+func createDnsRecord(client *alidns.Client, value string) string {
 	recordType := "TXT"
 	recordRR := "_acme-challenge"
 	recordTTL := int64(600)
+	domainName := os.Getenv("BAO_DOMAIN_NAME")
 
-	request := alidns.UpdateDomainRecordRequest{
-		RecordId: &recordId,
+	request := alidns.AddDomainRecordRequest{
 		Type:     &recordType,
 		Value:    &value,
 		RR:       &recordRR,
 		TTL:      &recordTTL,
+		DomainName: &domainName,
 	}
-	_, err := client.UpdateDomainRecord(&request)
 
+	response, err := client.AddDomainRecord(&request)
+
+	if err != nil {
+		log.Fatalf("Error making request: %v", err)
+	}
+
+	return *response.Body.RecordId
+}
+
+func deleteDnsRecord(client *alidns.Client, recordId string) {
+	deleteDomainRecordRequest := alidns.DeleteDomainRecordRequest{
+		RecordId: &recordId,
+	}
+	_, err := client.DeleteDomainRecord(&deleteDomainRecordRequest)
 	if err != nil {
 		log.Fatalf("Error making request: %v", err)
 	}
 }
 
+
 func main() {
 	log.SetPrefix("[BAO] ")
 
-	certbotValidation := os.Getenv("CERTBOT_VALIDATION")
+	action := os.Args[1]
 
-	if certbotValidation == "" {
-		log.Fatalln("No validation value found")
-	}
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
@@ -64,5 +96,17 @@ func main() {
 
 	dnsClient := createDnsClient()
 
-	updateDnsRecord(dnsClient, certbotValidation)
+	if (action == "-d") {
+		certbotAuthOutput := os.Getenv("CERTBOT_AUTH_OUTPUT")
+		deleteDnsRecord(dnsClient, certbotAuthOutput)
+		return
+	}
+
+	certbotValidation := os.Getenv("CERTBOT_VALIDATION")
+	if certbotValidation == "" {
+		log.Fatalln("No validation value found")
+	}
+	recordId := createDnsRecord(dnsClient, certbotValidation)
+
+	fmt.Print(recordId)
 }
