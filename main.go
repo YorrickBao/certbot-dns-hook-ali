@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	alidns "github.com/alibabacloud-go/alidns-20150109/v4/client"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
@@ -55,6 +56,11 @@ func createDnsRecord(client *alidns.Client, value string) string {
 	recordRR := "_acme-challenge"
 	recordTTL := int64(600)
 	domainName := os.Getenv("BAO_DOMAIN_NAME")
+	certbotDomain := os.Getenv("CERTBOT_DOMAIN")
+
+	if domainName != certbotDomain {
+		recordRR += "." + strings.Replace(certbotDomain, "." + domainName, "", 1)
+	}
 
 	request := alidns.AddDomainRecordRequest{
 		Type:     &recordType,
